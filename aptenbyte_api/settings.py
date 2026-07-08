@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -132,6 +133,13 @@ else:
             # Override with SQLITE_PATH (e.g. a mounted volume) so data survives container restarts.
             'NAME': os.environ.get('SQLITE_PATH') or (BASE_DIR / 'db.sqlite3'),
         }
+    }
+
+# Tests always use fast in-memory SQLite, never the real (remote Neon) database.
+if 'test' in sys.argv:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': ':memory:',
     }
 
 
