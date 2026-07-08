@@ -1,0 +1,19 @@
+# Local/prod run: `docker compose up --build`
+# Then create an admin: `docker compose exec api python manage.py createsuperuser`
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env            # GEMINI_API_KEY_*, OPENROUTER_API_KEY* live here
+    environment:
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      SQLITE_PATH: /data/db.sqlite3   # persisted on the volume below
+    volumes:
+      - aptenbyte_data:/data
+    restart: unless-stopped
+
+volumes:
+  aptenbyte_data:

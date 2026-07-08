@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+db.sqlite3
+staticfiles/
+.git/
+.gitignore
+*.md
+dev_smoke.py
+test_keys.py

@@ -1,0 +1,38 @@
+# Render Blueprint for the AptenByte API.
+# Deploy: push to a Git repo, then in the Render dashboard: New > Blueprint > pick this repo.
+# Secrets (sync: false) are NOT stored here — set them in the Render dashboard after the first deploy.
+services:
+  - type: web
+    name: aptenbyte-api
+    runtime: python
+    plan: free
+    # collectstatic bundles admin/DRF assets (served by WhiteNoise); migrate applies schema to Neon.
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
+    # gthread workers stream SSE fine; the long timeout covers the worst-case provider fallback chain.
+    startCommand: "gunicorn aptenbyte_api.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.7"
+      - key: DJANGO_DEBUG
+        value: "False"
+      # Django generates a strong secret for you; no need to set one by hand.
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      # --- set these in the dashboard (sync: false keeps them out of git) ---
+      - key: DATABASE_URL          # Neon POOLED connection string
+        sync: false
+      - key: DJANGO_ALLOWED_HOSTS  # e.g. aptenbyte-api.onrender.com,proxy.penguinscancode.com
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS  # e.g. https://aptenbyte.com,https://www.aptenbyte.com
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS  # e.g. https://aptenbyte-api.onrender.com
+        sync: false
+      - key: GEMINI_API_KEY_1
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY_2
+        sync: false
