@@ -141,6 +141,9 @@ if 'test' in sys.argv:
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': ':memory:',
     }
+    # Tests run over http on the test client; never force the https redirect
+    # (it would turn every request into a 301) regardless of DJANGO_DEBUG.
+    SECURE_SSL_REDIRECT = False
 
 
 # Password validation
@@ -221,14 +224,46 @@ AI_KEYS = {
             os.environ.get('OPENROUTER_API_KEY_2'),
         ) if k
     ],
+    # NVIDIA NIM (build.nvidia.com) is OpenAI-compatible; key looks like "nvapi-…".
+    # Accept _1/_2 (matches GEMINI_*) and the bare NVIDIA_API_KEY, so whichever
+    # name you set on Render is picked up.
+    'nvidia': [
+        k for k in (
+            os.environ.get('NVIDIA_API_KEY_1'),
+            os.environ.get('NVIDIA_API_KEY_2'),
+            os.environ.get('NVIDIA_API_KEY'),
+        ) if k
+    ],
 }
 # Google OAuth client IDs the mobile app signs in with (Android / iOS / web).
 # A Google ID token is accepted only if its audience is one of these.
 GOOGLE_OAUTH_CLIENT_IDS = _env_list('GOOGLE_OAUTH_CLIENT_IDS')
 
+# Each provider tries its models in order, falling through on error/rate-limit.
+# GEMINI_MODEL (singular) is still honoured as the first Gemini model.
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')
+GEMINI_MODELS = _env_list('GEMINI_MODELS') or list(dict.fromkeys([
+    GEMINI_MODEL,
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+]))
+# Free OpenRouter models, verified against the live catalogue (2026-07-08).
+# 'openrouter/free' is OpenRouter's own auto-router across free models — the most
+# robust first choice; the rest are concrete free instruct models tried in turn
+# on any 429/404. Availability shifts over time; override via OPENROUTER_MODELS.
 OPENROUTER_MODELS = _env_list('OPENROUTER_MODELS') or [
-    'meta-llama/llama-3.3-70b-instruct:free',
+    'openrouter/free',
     'openai/gpt-oss-120b:free',
+    'openai/gpt-oss-20b:free',
+    'meta-llama/llama-3.3-70b-instruct:free',
     'qwen/qwen3-next-80b-a3b-instruct:free',
+    'nousresearch/hermes-3-llama-3.1-405b:free',
+    'meta-llama/llama-3.2-3b-instruct:free',
+]
+# NVIDIA has no auto-router: exact model ids are required. These are free-to-use
+# hosted NIM models (rate/credit limited). Overridable via NVIDIA_MODELS.
+NVIDIA_MODELS = _env_list('NVIDIA_MODELS') or [
+    'meta/llama-3.3-70b-instruct',
+    'nvidia/llama-3.1-nemotron-70b-instruct',
+    'meta/llama-3.1-70b-instruct',
 ]
