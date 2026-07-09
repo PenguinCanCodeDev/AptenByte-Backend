@@ -5,7 +5,7 @@ from django.urls import path
 
 from accounts import views as auth_views
 from aiproxy.views import chat, rewrite
-from releases.views import version_manifest
+from releases.views import stats, version_manifest
 from waitlist.views import signup
 
 
@@ -35,4 +35,6 @@ urlpatterns = [
     path("v1/chat", chat),
     # Website waitlist signup.
     path("api/waitlist/", signup),
+    # Private admin dashboard data (gated by ADMIN_STATS_TOKEN).
+    path("api/stats/", stats),
 ]

@@ -267,3 +267,11 @@ NVIDIA_MODELS = _env_list('NVIDIA_MODELS') or [
     'nvidia/llama-3.1-nemotron-70b-instruct',
     'meta/llama-3.1-70b-instruct',
 ]
+
+# ── Admin dashboard (/api/stats/) ──────────────────────────────────────────────
+# Token that gates the private stats endpoint (sent as Bearer). Empty = disabled.
+ADMIN_STATS_TOKEN = os.environ.get('ADMIN_STATS_TOKEN', '')
+# GitHub repo whose release assets' download_count feeds the "downloads" stat.
+RELEASES_REPO = os.environ.get('RELEASES_REPO', 'PenguinCanCodeDev/aptenbyte-releases')
+# Optional GitHub token to raise the API rate limit (60/hr -> 5000/hr). Not required.
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
