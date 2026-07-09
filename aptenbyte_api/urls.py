@@ -20,6 +20,7 @@ urlpatterns = [
     path("version.json", version_manifest),
     path("aptenbyte/version.json", version_manifest),
     # Auth: email/password + Google sign-in. Returns a bearer token for the app.
+    path("auth/config", auth_views.config),
     path("auth/register", auth_views.register),
     path("auth/verify-email", auth_views.verify_email),
     path("auth/resend-verification", auth_views.resend_verification),

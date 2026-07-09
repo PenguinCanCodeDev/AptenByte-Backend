@@ -8,6 +8,7 @@ Verification/reset use 6-digit codes emailed to the user (see emails.py).
 
 import json
 
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -20,6 +21,23 @@ from .emails import send_code
 from .models import AuthToken, VerificationCode
 
 User = get_user_model()
+
+
+def config(request):
+    """Public sign-in config the app fetches at launch.
+
+    Returns the Google *Web* client id the app uses as the server client id for
+    Credential Manager (its ID token audience). Served from the server so it can
+    be set/rotated without shipping a new APK. ``google_web_client_id`` is empty
+    until GOOGLE_OAUTH_CLIENT_IDS is configured, which the app reads as "Google
+    sign-in not available yet" (BYOK still works).
+    """
+    ids = settings.GOOGLE_OAUTH_CLIENT_IDS
+    web_id = ids[0] if ids else ""
+    return JsonResponse({
+        "google_web_client_id": web_id,
+        "google_sign_in_enabled": bool(web_id),
+    })
 
 
 def _json(request):
