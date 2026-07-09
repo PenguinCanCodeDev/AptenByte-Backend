@@ -1,12 +1,24 @@
 import json
 
+from django.db.models import F
 from django.http import HttpResponseBadRequest, StreamingHttpResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from accounts.auth import require_user
 
+from .models import DailyUsage
 from .providers import stream_completion
+
+
+def _record(field):
+    """Increment today's counter for [field] ("rewrites" or "chats")."""
+    try:
+        obj, _ = DailyUsage.objects.get_or_create(date=timezone.localdate())
+        DailyUsage.objects.filter(pk=obj.pk).update(**{field: F(field) + 1})
+    except Exception:
+        pass  # never let stats bookkeeping break an AI request
 
 # The keyboard's ProxyLLMProvider builds a system+user turn for /rewrite and sends the raw message
 # list for /chat, then reads Server-Sent Events where each `data:` is {"text": "<delta>"} and the
@@ -43,6 +55,7 @@ def rewrite(request):
         {"role": "system", "content": system},
         {"role": "user", "content": text},
     ]
+    _record("rewrites")
     return _stream_response(messages)
 
 
@@ -63,4 +76,5 @@ def chat(request):
         for m in messages
         if isinstance(m, dict)
     ]
+    _record("chats")
     return _stream_response(cleaned)

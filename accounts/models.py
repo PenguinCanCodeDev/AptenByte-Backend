@@ -7,6 +7,23 @@ from django.utils import timezone
 from django.utils.crypto import constant_time_compare, salted_hmac
 
 
+class ClientInfo(models.Model):
+    """Last app version seen for a user, so the dashboard can show which app
+    versions are in use. Updated from the ``X-App-Version`` header on API calls.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="client_info",
+    )
+    app_version = models.CharField(max_length=40, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user} · {self.app_version}"
+
+
 class AuthToken(models.Model):
     """A bearer token the mobile app sends on API calls, tied to a user.
 

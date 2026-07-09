@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import ProviderHealth
+from .models import DailyUsage, ProviderHealth
+
+
+@admin.register(DailyUsage)
+class DailyUsageAdmin(admin.ModelAdmin):
+    list_display = ("date", "rewrites", "chats", "total")
+    ordering = ("-date",)
 
 
 @admin.register(ProviderHealth)

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.utils import timezone
 
-from .models import AuthToken
+from .models import AuthToken, ClientInfo
 
 
 def _bearer_key(request):
@@ -16,6 +16,17 @@ def _bearer_key(request):
     if header.startswith("Bearer "):
         return header[len("Bearer "):].strip()
     return None
+
+
+def _record_app_version(user, version):
+    """Upsert the user's last-seen app version (from the X-App-Version header)."""
+    version = (version or "").strip()[:40]
+    if not version:
+        return
+    try:
+        ClientInfo.objects.update_or_create(user=user, defaults={"app_version": version})
+    except Exception:
+        pass  # bookkeeping must never break an authenticated request
 
 
 def require_user(view):
@@ -37,6 +48,7 @@ def require_user(view):
         AuthToken.objects.filter(pk=token.pk).update(last_used_at=timezone.now())
         request.auth_user = token.user
         request.auth_token = token
+        _record_app_version(token.user, request.META.get("HTTP_X_APP_VERSION", ""))
         return view(request, *args, **kwargs)
 
     return wrapper

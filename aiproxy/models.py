@@ -25,3 +25,21 @@ class ProviderHealth(models.Model):
 
     def __str__(self):
         return f"{self.name} (p{self.priority})"
+
+
+class DailyUsage(models.Model):
+    """One row per day counting AI proxy requests, for the dashboard usage stats."""
+
+    date = models.DateField(unique=True)
+    rewrites = models.PositiveIntegerField(default=0)
+    chats = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-date"]
+
+    @property
+    def total(self):
+        return self.rewrites + self.chats
+
+    def __str__(self):
+        return f"{self.date}: {self.total}"

@@ -4,6 +4,8 @@ from datetime import timedelta
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
@@ -11,6 +13,24 @@ from django.utils.crypto import constant_time_compare
 from waitlist.models import Signup
 
 from .models import Release
+
+
+def _daily_series(qs, date_field, days):
+    """A list of {date, count} for the last [days] days from a datetime field,
+    with missing days filled as 0 (oldest first)."""
+    today = timezone.localdate()
+    start = today - timedelta(days=days - 1)
+    rows = (
+        qs.filter(**{f"{date_field}__date__gte": start})
+        .annotate(_d=TruncDate(date_field))
+        .values("_d")
+        .annotate(n=Count("id"))
+    )
+    by = {r["_d"]: r["n"] for r in rows}
+    return [
+        {"date": (start + timedelta(days=i)).isoformat(), "count": by.get(start + timedelta(days=i), 0)}
+        for i in range(days)
+    ]
 
 
 def version_manifest(request):
@@ -82,24 +102,78 @@ def stats(request):
     if not provided or not constant_time_compare(provided, token):
         return JsonResponse({"error": "unauthorized"}, status=401)
 
+    from accounts.models import AuthToken, ClientInfo
+    from aiproxy.models import DailyUsage, ProviderHealth
+
     User = get_user_model()
     now = timezone.now()
+    today = timezone.localdate()
     week_ago = now - timedelta(days=7)
+
+    total_users = User.objects.count()
+    # Google sign-in accounts have an unusable password (Django stores "!...").
+    google = User.objects.filter(password__startswith="!").count()
     users = {
-        "total": User.objects.count(),
+        "total": total_users,
         "verified": User.objects.filter(is_active=True).count(),
-        # Google sign-in accounts have an unusable password (Django stores "!...").
-        "google": User.objects.filter(password__startswith="!").count(),
+        "google": google,
+        "email": total_users - google,
         "new_7d": User.objects.filter(date_joined__gte=week_ago).count(),
     }
     waitlist = {
         "total": Signup.objects.count(),
         "new_7d": Signup.objects.filter(created_at__gte=week_ago).count(),
     }
+
+    # ── AI usage (all-time total + last 7 days) ──
+    agg = DailyUsage.objects.aggregate(r=Sum("rewrites"), c=Sum("chats"))
+    usage_map = {
+        u.date: u.rewrites + u.chats
+        for u in DailyUsage.objects.filter(date__gte=today - timedelta(days=6))
+    }
+    ai_by_day = [
+        {"date": (today - timedelta(days=6 - i)).isoformat(),
+         "count": usage_map.get(today - timedelta(days=6 - i), 0)}
+        for i in range(7)
+    ]
+    ai = {
+        "all_time": (agg["r"] or 0) + (agg["c"] or 0),
+        "today": usage_map.get(today, 0),
+        "week": sum(x["count"] for x in ai_by_day),
+        "by_day": ai_by_day,
+    }
+
+    # ── AI provider health (the live rotation) ──
+    providers = [
+        {"name": p.name, "priority": p.priority, "ok": p.success_count,
+         "fail": p.failure_count, "last_error": p.last_error, "healthy": p.last_error == ""}
+        for p in ProviderHealth.objects.order_by("priority", "name")
+    ]
+
+    rel = Release.objects.filter(is_current=True).first() or Release.objects.first()
+    release = {"versionName": rel.version_name, "versionCode": rel.version_code} if rel else None
+
+    # ── App version distribution among users ──
+    versions = [
+        {"version": v["app_version"] or "unknown", "users": v["n"]}
+        for v in ClientInfo.objects.values("app_version").annotate(n=Count("user")).order_by("-n")
+    ]
+
+    growth = {
+        "users_30d": _daily_series(User.objects.all(), "date_joined", 30),
+        "waitlist_30d": _daily_series(Signup.objects.all(), "created_at", 30),
+    }
+
     resp = JsonResponse({
         "downloads": _github_downloads(),
         "users": users,
         "waitlist": waitlist,
+        "ai": ai,
+        "providers": providers,
+        "sessions": AuthToken.objects.count(),
+        "release": release,
+        "versions": versions,
+        "growth": growth,
         "generated_at": now.isoformat(),
     })
     resp["Cache-Control"] = "no-store"
