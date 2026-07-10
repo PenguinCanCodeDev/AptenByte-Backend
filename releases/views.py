@@ -10,6 +10,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 
+from feedback.models import Feedback
 from waitlist.models import Signup
 
 from .models import Release
@@ -124,6 +125,14 @@ def stats(request):
         "total": Signup.objects.count(),
         "new_7d": Signup.objects.filter(created_at__gte=week_ago).count(),
     }
+    feedback = {
+        "total": Feedback.objects.count(),
+        "new_7d": Feedback.objects.filter(created_at__gte=week_ago).count(),
+        "by_category": {
+            row["category"]: row["n"]
+            for row in Feedback.objects.values("category").annotate(n=Count("category"))
+        },
+    }
 
     # ── AI usage (all-time total + last 7 days) ──
     agg = DailyUsage.objects.aggregate(r=Sum("rewrites"), c=Sum("chats"))
@@ -168,6 +177,7 @@ def stats(request):
         "downloads": _github_downloads(),
         "users": users,
         "waitlist": waitlist,
+        "feedback": feedback,
         "ai": ai,
         "providers": providers,
         "sessions": AuthToken.objects.count(),
