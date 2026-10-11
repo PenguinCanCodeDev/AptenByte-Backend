@@ -5,6 +5,7 @@ from django.urls import path
 
 from accounts import views as auth_views
 from aiproxy.views import chat, rewrite
+from crashes.views import submit as crash_submit
 from feedback.views import submit as feedback_submit
 from releases.views import stats, version_manifest
 from waitlist.views import signup
@@ -38,6 +39,8 @@ urlpatterns = [
     path("api/waitlist/", signup),
     # Website beta feedback / suggestions.
     path("api/feedback/", feedback_submit),
+    # App crash reports (stack frames only, no user text) from testers who allow analytics.
+    path("api/crash/", crash_submit),
     # Private admin dashboard data (gated by ADMIN_STATS_TOKEN).
     path("api/stats/", stats),
 ]

@@ -134,6 +134,40 @@ def stats(request):
         },
     }
 
+    # ── Crashes: totals + the most frequent distinct crashes (grouped by fingerprint) ──
+    from django.db.models import Max
+    from crashes.models import CrashReport
+    top = (
+        CrashReport.objects.values("fingerprint", "exception")
+        .annotate(n=Count("id"), last=Max("created_at"))
+        .order_by("-n")[:5]
+    )
+    crashes = {
+        "total": CrashReport.objects.count(),
+        "new_7d": CrashReport.objects.filter(created_at__gte=week_ago).count(),
+        "devices_7d": CrashReport.objects.filter(created_at__gte=week_ago).values("device").distinct().count(),
+        "by_day": _daily_series(CrashReport.objects.all(), "created_at", 14),
+        "top": [
+            {
+                "fingerprint": t["fingerprint"],
+                "exception": t["exception"],
+                "count": t["n"],
+                "last": t["last"].isoformat() if t["last"] else None,
+                "versions": sorted({
+                    v for v in CrashReport.objects.filter(fingerprint=t["fingerprint"])
+                    .values_list("app_version", flat=True) if v
+                }),
+                # First app frame of the newest report: where it blew up.
+                "where": next((
+                    l.strip()[3:] for l in (
+                        CrashReport.objects.filter(fingerprint=t["fingerprint"]).values_list("stack", flat=True).first() or ""
+                    ).splitlines() if "com.penguinscancode" in l
+                ), ""),
+            }
+            for t in top
+        ],
+    }
+
     # ── AI usage (all-time total + last 7 days) ──
     agg = DailyUsage.objects.aggregate(r=Sum("rewrites"), c=Sum("chats"))
     usage_map = {
@@ -178,6 +212,7 @@ def stats(request):
         "users": users,
         "waitlist": waitlist,
         "feedback": feedback,
+        "crashes": crashes,
         "ai": ai,
         "providers": providers,
         "sessions": AuthToken.objects.count(),

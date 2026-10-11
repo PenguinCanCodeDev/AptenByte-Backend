@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'aiproxy',
     'waitlist',
     'feedback',
+    'crashes',
 ]
 
 MIDDLEWARE = [
